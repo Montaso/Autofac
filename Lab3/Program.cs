@@ -106,7 +106,7 @@ public class Program
         using (var scope = container.BeginLifetimeScope("transaction"))
         {
             var processor = scope.Resolve<TransactionProcessor>();
-            processor.Process();
+            processor.ProcessTransaction();
         }
 
         Console.WriteLine("Super");
@@ -252,11 +252,11 @@ public interface ITransactionContext
 
 public class TransactionContext : ITransactionContext
 {
-    public Guid TransactionId { get; }
+    public Guid TransactionId { get; } = Guid.NewGuid();
 
     public TransactionContext()
     {
-        TransactionId = Guid.NewGuid();
+        Console.WriteLine($"UTWORZONO NOWY KONTEKST TRANSAKCJI: {TransactionId}");
     }
 }
 
@@ -271,7 +271,8 @@ public class StepOneService
 
     public void Execute()
     {
-        Console.WriteLine($"StepOneService - TransactionId: {_context.TransactionId}");
+        Console.WriteLine($"Krok 1: Przetwarzanie w ramach transakcji {_context.TransactionId}");
+
     }
 }
 
@@ -286,26 +287,27 @@ public class StepTwoService
 
     public void Execute()
     {
-        Console.WriteLine($"StepTwoService - TransactionId: {_context.TransactionId}");
+        Console.WriteLine($"Krok 2: Zapisywanie w ramach transakcji {_context.TransactionId}");
     }
 }
 
 public class TransactionProcessor
 {
-    private readonly StepOneService _stepOne;
-    private readonly StepTwoService _stepTwo;
-
-    public TransactionProcessor(StepOneService stepOne, StepTwoService stepTwo)
+    private readonly ILifetimeScope _scope;
+    public TransactionProcessor(ILifetimeScope scope) => _scope = scope;
+    public void ProcessTransaction()
     {
-        _stepOne = stepOne;
-        _stepTwo = stepTwo;
-    }
-
-    public void Process()
-    {
-        Console.WriteLine("=== Processing Transaction ===");
-        _stepOne.Execute();
-        _stepTwo.Execute();
+        // Tworzymy NOWY, OTAGOWANY zasięg czasu życia tylko dla tej transakcji
+        using (var transactionScope = _scope.BeginLifetimeScope("transaction"))
+        {
+            Console.WriteLine(" -> Rozpoczęto nową transakcję...");
+            // Rozwiązujemy zależności Z WNĘTRZA otagowanego zasięgu
+            var step1 = transactionScope.Resolve<StepOneService>();
+            var step2 = transactionScope.Resolve<StepTwoService>();
+            step1.Execute();
+            step2.Execute();
+            Console.WriteLine(" -> Transakcja zakończona.");
+        }
     }
 }
 

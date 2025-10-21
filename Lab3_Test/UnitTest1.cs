@@ -175,6 +175,9 @@ namespace Lab3_Test
         {
             var container = useImperative ? Program.BuildImperativeContainer() : Program.BuildDeclarativeContainer();
 
+            using var sw = new StringWriter();
+            Console.SetOut(sw);
+
             using var scope = container.BeginLifetimeScope("transaction");
 
             var stepOne = scope.Resolve<StepOneService>();
@@ -199,20 +202,26 @@ namespace Lab3_Test
         {
             var container = useImperative ? Program.BuildImperativeContainer() : Program.BuildDeclarativeContainer();
 
-            ITransactionContext context1, context2;
+            Guid id1, id2;
 
-            using (var scope1 = container.BeginLifetimeScope("transaction"))
+            using (var sw = new StringWriter())
             {
-                context1 = scope1.Resolve<ITransactionContext>();
+                Console.SetOut(sw);
+
+                using (var scope1 = container.BeginLifetimeScope("transaction"))
+                {
+                    var context1 = scope1.Resolve<ITransactionContext>();
+                    id1 = context1.TransactionId;
+                }
+
+                using (var scope2 = container.BeginLifetimeScope("transaction"))
+                {
+                    var context2 = scope2.Resolve<ITransactionContext>();
+                    id2 = context2.TransactionId;
+                }
             }
 
-            using (var scope2 = container.BeginLifetimeScope("transaction"))
-            {
-                context2 = scope2.Resolve<ITransactionContext>();
-            }
-
-            Assert.NotSame(context1, context2);
-            Assert.NotEqual(context1.TransactionId, context2.TransactionId);
+            Assert.NotEqual(id1, id2);
         }
 
         [Theory]
@@ -222,9 +231,12 @@ namespace Lab3_Test
         {
             var container = useImperative ? Program.BuildImperativeContainer() : Program.BuildDeclarativeContainer();
 
+            using var sw = new StringWriter();
+            Console.SetOut(sw);
+
             using var scope = container.BeginLifetimeScope();
 
-            Assert.Throws<DependencyResolutionException>(() => 
+            Assert.Throws<DependencyResolutionException>(() =>
                 scope.Resolve<ITransactionContext>());
         }
     }
